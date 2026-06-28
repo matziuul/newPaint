@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MacPaint</title>
+<style>
+/* ── Reset & base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: Chicago, Geneva, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    background: #999;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+}
+
+/* ── Menu bar ───────────────────────────────────────────────────────────── */
+#menubar {
+    flex: 0 0 auto;
+    height: 20px;
+    background: white;
+    border-bottom: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    gap: 0;
+}
+
+.menu-apple {
+    font-size: 16px;
+    padding: 0 8px;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.menu-item {
+    padding: 0 10px;
+    line-height: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.menu-item:hover, .menu-item.open { background: black; color: white; }
+
+.menu-sep { flex: 1; }
+
+.menu-select {
+    border: none;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    padding: 0 4px;
+    height: 20px;
+}
+
+.style-btn {
+    border: 1px solid #888;
+    background: white;
+    font: inherit;
+    cursor: pointer;
+    padding: 0 6px;
+    height: 18px;
+    margin: 0 1px;
+}
+.style-btn.active { background: black; color: white; }
+
+/* ── App body ───────────────────────────────────────────────────────────── */
+#app-body {
+    flex: 1 1 0;
+    display: flex;
+    overflow: hidden;
+}
+
+/* ── Left panel ─────────────────────────────────────────────────────────── */
+#left-panel {
+    flex: 0 0 auto;
+    width: 76px;
+    background: #d0d0d0;
+    border-right: 2px solid black;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0 8px;
+    gap: 6px;
+}
+
+.panel-label {
+    font-size: 9px;
+    color: #555;
+    width: 100%;
+    padding: 0 4px;
+    border-top: 1px solid #aaa;
+    padding-top: 4px;
+    margin-top: 2px;
+}
+
+/* ── Tool grid ──────────────────────────────────────────────────────────── */
+#toolGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 0 4px;
+    width: 100%;
+}
+
+.tool-btn {
+    width: 32px;
+    height: 30px;
+    border: 1px solid #888;
+    background: #e8e8e8;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    transition: none;
+}
+.tool-btn:hover  { background: #d0d0d0; }
+.tool-btn.active { background: black; color: white; border-color: black; }
+
+/* ── Pattern palette ────────────────────────────────────────────────────── */
+#patternGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    padding: 0 2px;
+    width: 100%;
+}
+
+.pat-swatch {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    image-rendering: pixelated;
+    /* border drawn on canvas */
+}
+.pat-swatch.active { outline: 2px solid #0055ff; outline-offset: 0px; }
+
+/* ── Brush shapes ────────────────────────────────────────────────────────── */
+#brushGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 0 2px;
+    width: 100%;
+}
+
+.brush-swatch {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 1px solid #888;
+    background: white;
+    image-rendering: pixelated;
+}
+.brush-swatch.active { outline: 2px solid #0055ff; }
+
+/* ── Line widths ─────────────────────────────────────────────────────────── */
+#lineGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0 4px;
+    width: 100%;
+}
+
+.line-swatch {
+    cursor: pointer;
+    border: 1px solid #888;
+    background: white;
+    image-rendering: pixelated;
+    display: block;
+}
+.line-swatch.active { outline: 2px solid #0055ff; }
+
+/* ── Canvas area ─────────────────────────────────────────────────────────── */
+#canvas-area {
+    flex: 1 1 0;
+    overflow: auto;
+    background: #888;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 20px;
+    gap: 20px;
+}
+
+/* ── Fatbits panel ────────────────────────────────────────────────────────── */
+#fatbits-panel {
+    flex: 0 0 auto;
+    background: white;
+    border: 2px solid black;
+    box-shadow: 3px 3px 0 2px rgba(0,0,0,0.5);
+    line-height: 0;
+}
+
+#fatbits-titlebar {
+    height: 18px;
+    background: white;
+    border-bottom: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    gap: 4px;
+    line-height: 18px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: default;
+}
+
+#fatbits-titlebar span { flex: 1; text-align: center; }
+
+#fatbits-zoom-label {
+    font-size: 10px;
+    color: #555;
+    min-width: 20px;
+    text-align: center;
+    line-height: 18px;
+}
+
+.fatbits-zoom-btn {
+    border: 1px solid #888;
+    background: #e8e8e8;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    width: 16px; height: 16px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+.fatbits-zoom-btn:hover { background: #ccc; }
+
+#fatbitsCanvas {
+    display: block;
+    cursor: crosshair;
+    image-rendering: pixelated;
+}
+
+/* Document window chrome */
+#doc-window {
+    background: white;
+    border: 2px solid black;
+    box-shadow: 3px 3px 0 2px rgba(0,0,0,0.5);
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+#doc-titlebar {
+    height: 18px;
+    background: white;
+    border-bottom: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    gap: 4px;
+    line-height: 18px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: default;
+}
+
+.doc-close {
+    width: 11px; height: 11px;
+    border: 1px solid black;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+#doc-titlebar span { flex: 1; text-align: center; }
+
+/* Canvas stack: paper below, overlay above */
+#canvas-stack {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+#paperCanvas, #overlayCanvas {
+    display: block;
+    image-rendering: pixelated;
+}
+
+#overlayCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    cursor: crosshair;
+}
+
+/* ── Status bar ──────────────────────────────────────────────────────────── */
+#statusbar {
+    flex: 0 0 auto;
+    height: 18px;
+    background: white;
+    border-top: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 16px;
+    font-size: 11px;
+}
+
+#statusbar .hint { margin-left: auto; color: #888; }
+</style>
+  <script type="module" crossorigin src="/assets/index-BF7vUaTT.js"></script>
+</head>
+<body>
+
+<!-- ── Menu bar ─────────────────────────────────────────────────────────── -->
+<div id="menubar">
+    <div class="menu-apple">&#8984;</div>
+
+    <!-- File menu -->
+    <div class="menu-item" id="menuNew">File</div>
+
+    <!-- Edit menu -->
+    <div class="menu-item" id="menuUndo" title="Undo ⌘Z">Edit</div>
+
+    <!-- Goodies / Save -->
+    <div class="menu-item" id="menuSave" title="Save as PNG">File</div>
+
+    <!-- Goodies menu (Fatbits) -->
+    <div class="menu-item" id="menuFatbits" title="Toggle Fatbits (dbl-click canvas)">Goodies</div>
+
+    <div class="menu-sep"></div>
+
+    <!-- Font -->
+    <select class="menu-select" id="menuFont" title="Font">
+        <option value="Geneva, Arial, sans-serif">Geneva</option>
+        <option value="'Courier New', monospace">Monaco</option>
+        <option value="'Times New Roman', serif">New York</option>
+        <option value="Chicago, Arial, sans-serif">Chicago</option>
+        <option value="Impact, Arial, sans-serif">Cairo</option>
+    </select>
+
+    <!-- Font size -->
+    <select class="menu-select" id="menuFontSize" title="Font size">
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="12">12</option>
+        <option value="14">14</option>
+        <option value="18">18</option>
+        <option value="24" selected>24</option>
+        <option value="36">36</option>
+        <option value="48">48</option>
+        <option value="72">72</option>
+    </select>
+
+    <!-- Style -->
+    <button class="style-btn" data-style="bold"   title="Bold">B</button>
+    <button class="style-btn" data-style="italic" title="Italic"><em>I</em></button>
+
+    <div class="menu-sep"></div>
+    <!-- Undo/Redo keyboard shortcuts shown in hint -->
+    <div class="menu-item" id="menuRedo" style="font-size:10px;color:#888">⌘Z undo · ⌘⇧Z redo</div>
+</div>
+
+<!-- ── App body ──────────────────────────────────────────────────────────── -->
+<div id="app-body">
+
+    <!-- ── Left panel ──────────────────────────────────────────────────── -->
+    <aside id="left-panel">
+        <!-- Tool grid (2 × 7 = 14 buttons) -->
+        <div id="toolGrid"></div>
+
+        <!-- Pattern palette -->
+        <div class="panel-label">Patterns</div>
+        <div id="patternGrid"></div>
+
+        <!-- Brush shapes -->
+        <div class="panel-label">Brush</div>
+        <div id="brushGrid"></div>
+
+        <!-- Line widths -->
+        <div class="panel-label">Line</div>
+        <div id="lineGrid"></div>
+    </aside>
+
+    <!-- ── Canvas area ─────────────────────────────────────────────────── -->
+    <div id="canvas-area">
+        <div id="doc-window">
+            <div id="doc-titlebar">
+                <div class="doc-close"></div>
+                <span>MacPaint</span>
+            </div>
+            <div id="canvas-stack">
+                <canvas id="paperCanvas"   width="576" height="720"></canvas>
+                <canvas id="overlayCanvas" width="576" height="720"></canvas>
+            </div>
+        </div>
+
+        <!-- Fatbits panel — hidden until toggled -->
+        <div id="fatbits-panel" style="display:none">
+            <div id="fatbits-titlebar">
+                <div class="doc-close" id="fatbits-close"></div>
+                <span>Fatbits</span>
+                <button class="fatbits-zoom-btn" id="fatbits-zoom-out" title="Zoom out">−</button>
+                <span id="fatbits-zoom-label">8×</span>
+                <button class="fatbits-zoom-btn" id="fatbits-zoom-in"  title="Zoom in">+</button>
+            </div>
+            <canvas id="fatbitsCanvas" width="288" height="288"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Status bar ────────────────────────────────────────────────────────── -->
+<div id="statusbar">
+    <span id="statusPos"></span>
+    <span class="hint">S pencil · B brush · Y spray · E erase · F fill · T text · L line · ⌘Z undo · dbl-click: fatbits · shift-click: pan fatbits</span>
+</div>
+
+</body>
+</html>
