@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NewPaint</title>
+<style>
+/* ── Reset & base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: Chicago, Geneva, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    background: #999;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+}
+
+/* ── Menu bar ───────────────────────────────────────────────────────────── */
+#menubar {
+    flex: 0 0 auto;
+    height: 20px;
+    background: white;
+    border-bottom: 1px solid black;
+    display: flex;
+    align-items: stretch;
+    padding: 0;
+    position: relative;
+    z-index: 100;
+}
+
+.menu-apple {
+    font-size: 14px;
+    padding: 0 10px;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid #ccc;
+}
+
+.menu-wrap {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+}
+
+.menu-title {
+    padding: 0 10px;
+    cursor: default;
+    user-select: none;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+}
+.menu-title:hover { background: #eee; }
+.menu-title.open  { background: black; color: white; }
+
+.menu-drop {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid black;
+    min-width: 180px;
+    z-index: 200;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.35);
+}
+.menu-drop.open { display: block; }
+
+.menu-drop-item {
+    padding: 2px 20px 2px 8px;
+    cursor: default;
+    user-select: none;
+    white-space: nowrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+    line-height: 18px;
+    position: relative;
+}
+.menu-drop-item:hover { background: black; color: white; }
+.menu-drop-item:hover .menu-kbd { color: #bbb; }
+
+/* Items in checkable menus reserve space for the tick mark */
+.menu-drop.checkable .menu-drop-item { padding-left: 20px; }
+.menu-drop.checkable .menu-drop-item.checked::before {
+    content: '✓';
+    position: absolute;
+    left: 5px;
+    font-size: 11px;
+}
+
+.menu-kbd {
+    font-size: 11px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.menu-drop-sep {
+    height: 1px;
+    background: #aaa;
+    margin: 2px 0;
+}
+
+/* ── App body ───────────────────────────────────────────────────────────── */
+#app-body {
+    flex: 1 1 0;
+    display: flex;
+    overflow: hidden;
+}
+
+/* ── Left panel ─────────────────────────────────────────────────────────── */
+#left-panel {
+    flex: 0 0 auto;
+    width: 76px;
+    background: #d0d0d0;
+    border-right: 2px solid black;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0 8px;
+    gap: 6px;
+}
+
+.panel-label {
+    font-size: 9px;
+    color: #555;
+    width: 100%;
+    padding: 0 4px;
+    border-top: 1px solid #aaa;
+    padding-top: 4px;
+    margin-top: 2px;
+}
+
+/* ── Tool grid ──────────────────────────────────────────────────────────── */
+#toolGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 0 4px;
+    width: 100%;
+}
+
+.tool-btn {
+    width: 32px;
+    height: 30px;
+    border: 1px solid #888;
+    background: #e8e8e8;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    transition: none;
+}
+.tool-btn:hover  { background: #d0d0d0; }
+.tool-btn.active { background: black; color: white; border-color: black; }
+
+/* ── Right side column (pattern strip + canvas) ──────────────────────────── */
+#right-side {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Pattern strip ───────────────────────────────────────────────────────── */
+#pattern-strip {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    background: #d0d0d0;
+    border-bottom: 1px solid #aaa;
+    border-right: 1px solid #aaa;
+    padding: 3px 6px;
+}
+
+#patternGrid {
+    display: grid;
+    grid-template-rows: repeat(2, 16px);
+    grid-auto-flow: column;
+    gap: 1px;
+}
+
+.pat-swatch {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    image-rendering: pixelated;
+    display: block;
+}
+.pat-swatch.active { outline: 2px solid #0055ff; outline-offset: 0px; }
+
+/* ── Brush shapes ────────────────────────────────────────────────────────── */
+#brushGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 0 2px;
+    width: 100%;
+}
+
+.brush-swatch {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 1px solid #888;
+    background: white;
+    image-rendering: pixelated;
+}
+.brush-swatch.active { outline: 2px solid #0055ff; }
+
+/* ── Line widths ─────────────────────────────────────────────────────────── */
+#lineGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0 4px;
+    width: 100%;
+}
+
+.line-swatch {
+    cursor: pointer;
+    border: 1px solid #888;
+    background: white;
+    image-rendering: pixelated;
+    display: block;
+}
+.line-swatch.active { outline: 2px solid #0055ff; }
+
+/* ── Canvas area ─────────────────────────────────────────────────────────── */
+#canvas-area {
+    flex: 1 1 0;
+    overflow: auto;
+    background: #888;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+/* ── Fatbits panel ────────────────────────────────────────────────────────── */
+#fatbits-panel {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 50;
+    background: white;
+    border: 2px solid black;
+    box-shadow: 3px 3px 0 2px rgba(0,0,0,0.5);
+    line-height: 0;
+    user-select: none;
+}
+
+#fatbits-titlebar {
+    height: 18px;
+    background: white;
+    border-bottom: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    gap: 4px;
+    line-height: 18px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: move;
+}
+
+#fatbits-titlebar span { flex: 1; text-align: center; }
+
+#fatbits-zoom-label {
+    font-size: 10px;
+    color: #555;
+    min-width: 20px;
+    text-align: center;
+    line-height: 18px;
+}
+
+.fatbits-zoom-btn {
+    border: 1px solid #888;
+    background: #e8e8e8;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    width: 16px; height: 16px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+.fatbits-zoom-btn:hover { background: #ccc; }
+
+#fatbitsCanvas {
+    display: block;
+    cursor: crosshair;
+    image-rendering: pixelated;
+}
+
+/* Document window chrome */
+#doc-window {
+    flex-shrink: 0;
+    background: white;
+    border: 2px solid black;
+    box-shadow: 3px 3px 0 2px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    line-height: 0;
+}
+
+#doc-titlebar {
+    height: 18px;
+    background: white;
+    border-bottom: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    gap: 4px;
+    line-height: 18px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: default;
+}
+
+.doc-close {
+    width: 11px; height: 11px;
+    border: 1px solid black;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+#doc-titlebar span { flex: 1; text-align: center; }
+
+/* Canvas stack: paper below, overlay above */
+#canvas-stack {
+    position: relative;
+    line-height: 0;
+    overflow: hidden;
+}
+
+#paperCanvas, #overlayCanvas {
+    display: block;
+    image-rendering: pixelated;
+}
+
+#overlayCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    cursor: crosshair;
+}
+
+/* ── Color wheel panel ───────────────────────────────────────────────────── */
+#colorPanel {
+    width: 100%;
+    padding: 0 4px;
+    box-sizing: border-box;
+}
+
+.cw-swatches {
+    position: relative;
+    height: 32px;
+    margin-bottom: 4px;
+}
+
+.cw-swatch {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 1px solid black;
+    box-sizing: border-box;
+}
+
+.cw-bg {
+    bottom: 0;
+    left: 0;
+    background: white;
+    cursor: pointer;
+}
+
+.cw-fg {
+    top: 0;
+    left: 10px;
+    z-index: 1;
+    background: black;
+}
+
+.cw-swap {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border: 1px solid #888;
+    background: #e8e8e8;
+    cursor: pointer;
+    font-size: 9px;
+    padding: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cw-swap:hover { background: #d0d0d0; }
+
+.cw-canvas {
+    display: block;
+    cursor: crosshair;
+}
+
+.cw-hex {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: monospace;
+    font-size: 10px;
+    border: 1px solid #888;
+    padding: 1px 3px;
+    margin-top: 3px;
+}
+
+/* ── Status bar ──────────────────────────────────────────────────────────── */
+#statusbar {
+    flex: 0 0 auto;
+    height: 18px;
+    background: white;
+    border-top: 1px solid black;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 16px;
+    font-size: 11px;
+}
+
+#statusbar .hint { margin-left: auto; color: #888; }
+</style>
+</head>
+<body>
+
+<!-- ── Menu bar ─────────────────────────────────────────────────────────── -->
+<div id="menubar">
+    <div class="menu-apple">&#8984;</div>
+
+    <!-- File -->
+    <div class="menu-wrap">
+        <span class="menu-title">File</span>
+        <div class="menu-drop">
+            <div class="menu-drop-item" id="menuNew">New</div>
+            <div class="menu-drop-sep"></div>
+            <div class="menu-drop-item" id="menuLoad">Open…<span class="menu-kbd">⌘O</span></div>
+            <div class="menu-drop-item" id="menuSave">Save as PNG<span class="menu-kbd">⌘S</span></div>
+        </div>
+    </div>
+
+    <!-- Edit -->
+    <div class="menu-wrap">
+        <span class="menu-title">Edit</span>
+        <div class="menu-drop">
+            <div class="menu-drop-item" id="menuUndo">Undo<span class="menu-kbd">⌘Z</span></div>
+            <div class="menu-drop-item" id="menuRedo">Redo<span class="menu-kbd">⌘⇧Z</span></div>
+            <div class="menu-drop-sep"></div>
+            <div class="menu-drop-item" id="menuSelectAll">Select All<span class="menu-kbd">⌘A</span></div>
+        </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="menu-wrap">
+        <span class="menu-title">Canvas</span>
+        <div class="menu-drop">
+            <div class="menu-drop-item" id="menuCanvasSize">Canvas Size…</div>
+        </div>
+    </div>
+
+    <!-- Goodies -->
+    <div class="menu-wrap">
+        <span class="menu-title">Goodies</span>
+        <div class="menu-drop">
+            <div class="menu-drop-item" id="menuFatbits">Fatbits</div>
+        </div>
+    </div>
+
+    <!-- Font -->
+    <div class="menu-wrap">
+        <span class="menu-title">Font</span>
+        <div class="menu-drop checkable">
+            <div class="menu-drop-item font-item checked" data-font="Geneva, Arial, sans-serif">Geneva</div>
+            <div class="menu-drop-item font-item" data-font="'Courier New', monospace">Monaco</div>
+            <div class="menu-drop-item font-item" data-font="'Times New Roman', serif">New York</div>
+            <div class="menu-drop-item font-item" data-font="Chicago, Arial, sans-serif">Chicago</div>
+            <div class="menu-drop-item font-item" data-font="Impact, Arial, sans-serif">Cairo</div>
+        </div>
+    </div>
+
+    <!-- Size -->
+    <div class="menu-wrap">
+        <span class="menu-title">Size</span>
+        <div class="menu-drop checkable">
+            <div class="menu-drop-item size-item" data-size="9">9</div>
+            <div class="menu-drop-item size-item" data-size="10">10</div>
+            <div class="menu-drop-item size-item" data-size="12">12</div>
+            <div class="menu-drop-item size-item" data-size="14">14</div>
+            <div class="menu-drop-item size-item" data-size="18">18</div>
+            <div class="menu-drop-item size-item checked" data-size="24">24</div>
+            <div class="menu-drop-item size-item" data-size="36">36</div>
+            <div class="menu-drop-item size-item" data-size="48">48</div>
+            <div class="menu-drop-item size-item" data-size="72">72</div>
+        </div>
+    </div>
+
+    <!-- Style -->
+    <div class="menu-wrap">
+        <span class="menu-title">Style</span>
+        <div class="menu-drop checkable">
+            <div class="menu-drop-item style-item checked" data-style="normal">Plain Text</div>
+            <div class="menu-drop-sep"></div>
+            <div class="menu-drop-item style-item" data-style="bold">Bold<span class="menu-kbd">⌘B</span></div>
+            <div class="menu-drop-item style-item" data-style="italic">Italic<span class="menu-kbd">⌘I</span></div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+</div>
+
+<!-- ── App body ──────────────────────────────────────────────────────────── -->
+<div id="app-body">
+
+    <!-- ── Left panel ──────────────────────────────────────────────────── -->
+    <aside id="left-panel">
+        <!-- Tool grid (2 × 7 = 14 buttons) -->
+        <div id="toolGrid"></div>
+
+        <!-- Brush shapes -->
+        <div class="panel-label">Brush</div>
+        <div id="brushGrid"></div>
+
+        <!-- Line widths -->
+        <div class="panel-label">Line</div>
+        <div id="lineGrid"></div>
+
+        <!-- Color wheel -->
+        <div class="panel-label">Color</div>
+        <div id="colorPanel"></div>
+    </aside>
+
+    <!-- ── Right side: pattern strip + canvas ────────────────────────── -->
+    <div id="right-side">
+
+    <!-- Pattern strip — horizontal, just below menubar, right of toolbar -->
+    <div id="pattern-strip">
+        <div id="patternGrid"></div>
+    </div>
+
+    <!-- ── Canvas area ─────────────────────────────────────────────────── -->
+    <div id="canvas-area">
+        <div id="doc-window">
+            <div id="doc-titlebar">
+                <div class="doc-close"></div>
+                <span>NewPaint</span>
+            </div>
+            <div id="canvas-stack">
+                <canvas id="paperCanvas"></canvas>
+                <canvas id="overlayCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Fatbits panel — hidden until toggled -->
+        <div id="fatbits-panel" style="display:none">
+            <div id="fatbits-titlebar">
+                <div class="doc-close" id="fatbits-close"></div>
+                <span>Fatbits</span>
+                <button class="fatbits-zoom-btn" id="fatbits-zoom-out" title="Zoom out">−</button>
+                <span id="fatbits-zoom-label">8×</span>
+                <button class="fatbits-zoom-btn" id="fatbits-zoom-in"  title="Zoom in">+</button>
+            </div>
+            <canvas id="fatbitsCanvas" width="288" height="288"></canvas>
+        </div>
+    </div>
+
+    </div><!-- #right-side -->
+
+</div>
+
+<!-- ── Status bar ────────────────────────────────────────────────────────── -->
+<div id="statusbar">
+    <span id="statusPos"></span>
+    <span class="hint">S pencil · B brush · Y spray · E erase · F fill · T text · L line · R rect · ⌘Z undo · dbl-click: fatbits · shift-drag: pan fatbits</span>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
